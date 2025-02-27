@@ -1,0 +1,3 @@
+[submodule "eigentensor"]
+	path = eigentensor
+	url = https://github.com/ToxicPine/eigentensor
