@@ -1,12 +1,13 @@
 from anytensor.core import TensorContext, GraphProgram, execute_graph_on_gpu
 from tinygrad import Tensor, dtypes
 from tinygrad.nn.datasets import mnist
-from tinygrad.nn.state import safe_load
+from tinygrad.nn.state import safe_load, load_state_dict, get_state_dict
 from tinygrad import nn
 from typing import List, Callable
 from rich import print
 from rich.logging import RichHandler
 import logging
+import cv2
 
 # Configure rich logging
 logging.basicConfig(
@@ -46,31 +47,78 @@ class Model:
         return x.sequential(self.layers)
 
     def load(self, weights):
-        self.__dict__.update(weights)
+        load_state_dict(self, weights)
 
 
-def preprocess_image_numpy(image_bytes):
-    """Process image bytes to a normalized numpy array of shape (1, 1, 28, 28)"""
-    # Convert bytes to numpy array
-    nparr = np.frombuffer(image_bytes, np.uint8)
+def load_and_preprocess_image(image_path: str) -> Tensor:
+    """Load and preprocess a local image for MNIST prediction."""
+    # Step 1: Load the image in grayscale mode (single channel, like MNIST)
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
-    # Check if this is a PNG/JPG (attempt to decode)
-    try:
-        # If image is in a common format (PNG/JPG), try to decode it
-        import cv2  # Only import if needed
+    # Make sure the image was loaded successfully
+    if img is None:
+        log.error("Could Not Load Image")
+        raise ValueError("Could Not Load Image")
 
-        img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
-        img = cv2.resize(img, (28, 28))
-    except:
-        log.error("Failed to decode image")
-        # If decoding fails, assume it's already a raw array format
-        img = nparr.reshape(28, 28)
+    # Check if image is already in MNIST format (28x28 pixels)
+    is_mnist = img.shape[0] == 28 and img.shape[1] == 28
 
-    # Normalize to 0-1 range
-    img_norm = img.astype(np.float32) / 255.0
+    if not is_mnist:
+        # Step 2: Resize and preprocess non-MNIST images
+        # Start with a larger size for better quality processing
+        target_size = 128
+        aspect_ratio = img.shape[1] / img.shape[0]
+        if aspect_ratio > 1:
+            new_width = target_size
+            new_height = int(target_size / aspect_ratio)
+        else:
+            new_height = target_size
+            new_width = int(target_size * aspect_ratio)
+        img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
-    # Reshape to (1, 1, 28, 28) - adding batch and channel dimensions
-    return img_norm.reshape(1, 1, 28, 28)
+        # Step 3: Enhance image contrast to separate digit from background
+        # img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
+
+        # Step 4: Convert to pure black and white using adaptive thresholding
+        _, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Step 5: Find and crop to the digit's bounding box
+        coords = cv2.findNonZero(255 - img)
+        if coords is not None:
+            # Get the rectangle containing the digit
+            x, y, w, h = cv2.boundingRect(coords)
+            # Add 20% padding around the digit
+            padding = int(max(w, h) * 0.2)
+            x = max(0, x - padding)
+            y = max(0, y - padding)
+            w = min(img.shape[1] - x, w + 2 * padding)
+            h = min(img.shape[0] - y, h + 2 * padding)
+            img = img[y : y + h, x : x + w]
+
+        # Step 6: Make the image square by adding black padding
+        size = max(img.shape)
+        square = np.zeros((size, size), dtype=np.uint8)
+        offset_y = (size - img.shape[0]) // 2
+        offset_x = (size - img.shape[1]) // 2
+        square[
+            offset_y : offset_y + img.shape[0], offset_x : offset_x + img.shape[1]
+        ] = img
+
+        # Step 7: Resize to MNIST size (28x28 pixels)
+        img = cv2.resize(square, (28, 28), interpolation=cv2.INTER_AREA)
+
+    # Step 8: Convert to float32 (keep 0-255 range like MNIST)
+    img = img.astype(np.float32)
+
+    # Step 9: Invert if needed (MNIST uses white digits on black background)
+    if np.mean(img) > 127:
+        img = 255 - img
+
+    # Step 10: Reshape to match MNIST format: (batch_size=1, channels=1, height=28, width=28)
+    img = img.reshape(1, 1, 28, 28)
+
+    # Step 11: Convert to TinyGrad tensor for model input
+    return Tensor(img)
 
 
 # For inference, set the model to evaluation mode
@@ -111,7 +159,7 @@ def infer_on_image_regular(image_path):
     log.info(f"Processing image with hash: {img_hash}")
 
     # Convert image bytes to numpy array
-    img_array = preprocess_image_numpy(img_bytes)
+    img_array = load_and_preprocess_image(img_bytes)
     log.info(
         f"Image array shape: {img_array.shape}, min: {img_array.min()}, max: {img_array.max()}"
     )
@@ -129,9 +177,8 @@ def infer_on_image_regular(image_path):
     fresh_model.load(weights)
 
     # Run inference with the fresh model
-    with Tensor.test():
-        predictions = fresh_model(img_tensor)
-        predicted_class = predictions.argmax(axis=1).item()
+    predictions = fresh_model(img_tensor)
+    predicted_class = predictions.argmax(axis=1).item()
 
     log.info(f"Predicted digit: {predicted_class}")
     return predicted_class
@@ -151,7 +198,7 @@ def infer_on_image_anytensor(image_path):
     log.info(f"Processing image with hash: {img_hash}")
 
     # Convert image bytes to numpy array
-    img_array = preprocess_image_numpy(img_bytes)
+    img_array = load_and_preprocess_image(image_path)
     log.info(
         f"Image array shape: {img_array.shape}, min: {img_array.min()}, max: {img_array.max()}"
     )
@@ -170,8 +217,8 @@ def infer_on_image_anytensor(image_path):
 
     # Create a fresh graph program
     log.info("Compiling fresh graph program")
-    context = TensorContext()
-    input_image = context.add_graph_input("input_image", (1, 1, 28, 28), dtypes.float32)
+    # context = TensorContext()
+    # input_image = context.add_graph_input("input_image", (1, 1, 28, 28), dtypes.float32)
     # Load the pre-compiled graph program from file
     with open("./mnist_program.eigentensor", "rb") as f:
         graph_program = GraphProgram.from_bytes(f.read())
