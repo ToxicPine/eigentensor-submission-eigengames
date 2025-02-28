@@ -2,27 +2,52 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { image } = await request.json()
+    // Parse the multipart form data
+    const formData = await request.formData()
+    const imageFile = formData.get('image') as File
     
-    // Here you would normally send the image to your ML backend
-    // For this example, we'll simulate a response with a random number
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    // 10% chance of error for demonstration
-    if (Math.random() < 0.1) {
-      return NextResponse.json({ status: 'error' })
+    if (!imageFile) {
+      return NextResponse.json({ 
+        status: 'error', 
+        message: 'No Image Provided' 
+      }, { status: 400 })
     }
     
-    // Random prediction between 0-9
-    const prediction = Math.floor(Math.random() * 10)
+    // Convert the file to an ArrayBuffer
+    const imageBuffer = await imageFile.arrayBuffer()
     
-    return NextResponse.json({ 
-      status: 'success',
-      prediction
+    // Convert ArrayBuffer to base64 for the ML backend
+    // (assuming the ML backend still expects base64)
+    const base64Image = Buffer.from(imageBuffer).toString('base64')
+    
+    // Send image to ML backend
+    const response = await fetch('http://localhost:8989/infer', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_bytes: base64Image,
+        mode: 'regular'
+      })
     })
+
+    const result = await response.json()
+
+    if (result.status === 'error' || !response.ok) {
+      return NextResponse.json({ status: 'error', message: result.message }, { status: 400 })
+    }
+
+    return NextResponse.json({
+      status: 'success', 
+      prediction: result.data
+    })
+
   } catch (error) {
-    return NextResponse.json({ status: 'error' }, { status: 500 })
+    console.error('Error calling ML backend:', error)
+    return NextResponse.json({ 
+      status: 'error',
+      message: 'Failed to get prediction'
+    }, { status: 500 })
   }
-} 
+}

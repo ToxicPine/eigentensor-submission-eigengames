@@ -48,16 +48,21 @@ export default function Home() {
     setIsSubmitting(true)
     
     try {
-      // Convert canvas to base64 image
-      const imageData = canvasRef.toDataURL('image/png')
+      // Get canvas data as binary blob instead of base64
+      const blob = await new Promise<Blob>((resolve) => {
+        canvasRef.toBlob((blob) => {
+          if (blob) resolve(blob)
+        }, 'image/png')
+      })
       
-      // Send to API
+      // Create FormData to send binary data
+      const formData = new FormData()
+      formData.append('image', blob, 'drawing.png')
+      
+      // Send to API with proper content type for binary data
       const response = await fetch('/api/predict', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image: imageData }),
+        body: formData,
       })
       
       const data = await response.json()
