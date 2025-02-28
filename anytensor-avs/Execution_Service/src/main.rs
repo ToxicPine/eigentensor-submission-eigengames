@@ -12,12 +12,12 @@ fn init_dal_service() {
     let eth_rpc_url = env::var("OTHENTIC_CLIENT_RPC_ADDRESS").expect("ETH_RPC_URL is not set in environment variables");
 
     services::dal_service::init_config(private_key, eth_rpc_url);
-    println!("DAL service initialized.");
+    println!("DAL Service Initialized.");
 }
 
 // Define a simple health-check endpoint
 async fn health_check() -> impl Responder {
-    "Server is running"
+    "Server is Running"
 }
 
 // Main function

@@ -1,20 +1,32 @@
 use reqwest::Error;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use std::collections::HashMap;
 
-#[derive(Deserialize)]
-pub struct PriceResponse {
-    pub symbol: String,
-    pub price: String,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct TaskInput {
+    pub task_uuid: Uuid,
+    pub weights_uuid: Uuid,
+    pub input_tensors: HashMap<String, Vec<u8>>,
 }
 
-pub async fn get_price(pair: &str) -> Result<PriceResponse, Error> {
-    let url = format!("https://api.binance.com/api/v3/ticker/price?symbol={}", pair);
-    
-    // Send the GET request and await the response
-    let response = reqwest::get(&url).await?;
+#[derive(Deserialize, Debug)]
+#[serde(tag = "status")]
+pub enum OracleResponse {
+    #[serde(rename = "success")]
+    Success { data: i32 },
+    #[serde(rename = "error")] 
+    Error { message: String }
+}
 
-    // Deserialize the JSON response into the PriceResponse struct
-    let price_response: PriceResponse = response.json().await?;
+pub async fn compute_tensor(task_input: &TaskInput) -> Result<OracleResponse, Error> {
+    let client = reqwest::Client::new();
+    let port = std::env::var("ANYTENSOR_PORT").unwrap_or_else(|_| "4444".to_string());
+    let url = format!("http://localhost:{}/execute", port);
+    let response = client.post(url)
+        .json(&task_input)
+        .send()
+        .await?;
 
-    Ok(price_response)
+    Ok(response.json::<OracleResponse>().await?)
 }

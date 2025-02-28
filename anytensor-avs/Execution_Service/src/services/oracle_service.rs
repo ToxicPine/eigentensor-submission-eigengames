@@ -10,7 +10,16 @@ pub struct TaskInput {
     pub input_tensors: HashMap<String, Vec<u8>>,
 }
 
-pub async fn compute_tensor(task_input: &TaskInput) -> Result<TaskInput, Error> {
+#[derive(Deserialize, Debug)]
+#[serde(tag = "status")]
+pub enum OracleResponse {
+    #[serde(rename = "success")]
+    Success { data: i32 },
+    #[serde(rename = "error")] 
+    Error { message: String }
+}
+
+pub async fn compute_tensor(task_input: &TaskInput) -> Result<OracleResponse, Error> {
     let client = reqwest::Client::new();
     let port = std::env::var("ANYTENSOR_PORT").unwrap_or_else(|_| "4444".to_string());
     let url = format!("http://localhost:{}/execute", port);
@@ -19,5 +28,5 @@ pub async fn compute_tensor(task_input: &TaskInput) -> Result<TaskInput, Error> 
         .send()
         .await?;
 
-    Ok(response.json::<TaskInput>().await?)
+    Ok(response.json::<OracleResponse>().await?)
 }

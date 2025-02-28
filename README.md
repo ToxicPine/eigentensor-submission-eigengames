@@ -95,6 +95,8 @@ We built an AVS for EigenTensor using the Othentic SDK. This AVS is a simple RES
 
 We leverage their inbuilt consensus system heavily.
 
+Although we're not absolutely certain that our implementation is bug-free, we've definitely implemented the important business logic correctly: since GPU computations are not deterministic, we introduce the Manhattan distance metric to determine whether any tensors produced by different nodes are near-equal.
+
 ## Economic Security Model
 
 The security of EigenTensor relies on game-theoretic principles of EigenLayer's restaking model. 

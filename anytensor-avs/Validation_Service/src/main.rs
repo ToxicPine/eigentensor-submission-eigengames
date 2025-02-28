@@ -1,5 +1,5 @@
 use std::env;
-use actix_web::{web, App, HttpServer, Responder};
+use actix_web::{web, App, HttpServer};
 mod services;
 
 mod handlers {

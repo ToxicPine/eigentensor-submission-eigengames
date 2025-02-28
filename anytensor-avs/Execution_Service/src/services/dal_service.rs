@@ -46,7 +46,7 @@ pub fn init_config(private_key: String, eth_rpc_url: String) {
     }
 }
 
-pub async fn send_task(proof_of_task: String, task_definition_id: i32) -> Result<(), Box<dyn Error>> {
+pub async fn send_task(proof_of_task: Vec<u8>, task_definition_id: i32) -> Result<(), Box<dyn Error>> {
     // Access global Config
     let config = unsafe {
         CONFIG.as_ref().expect("Config is not initialized")
@@ -63,7 +63,9 @@ pub async fn send_task(proof_of_task: String, task_definition_id: i32) -> Result
     let performer_address = signer.address();
 
     println!("Address {:?}, {:?}, {:?}, {}", proof_of_task, result, performer_address, task_definition_id );
-    let my_values = (proof_of_task.to_string(), &result, performer_address, task_definition_id);
+    
+    // Clone proof_of_task before using it in my_values
+    let my_values = (proof_of_task.clone(), &result, performer_address, task_definition_id);
 
     let encoded_data = my_values.abi_encode_params();
 

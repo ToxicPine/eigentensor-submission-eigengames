@@ -4,13 +4,6 @@ use std::collections::HashMap;
 use uuid::Uuid;
 use crate::services::oracle_service;
 
-#[derive(Debug, Clone)]
-pub(crate) struct TaskId(Uuid);
-
-#[derive(Debug, Clone)]
-pub(crate) struct WeightsId(Uuid);
-
-
 #[derive(Deserialize)]
 pub struct ExecuteTaskPayload {
     pub task_uuid: String,
@@ -48,12 +41,12 @@ pub async fn execute_task(payload: web::Json<ExecuteTaskPayload>) -> impl Respon
     };
 
     match oracle_service::compute_tensor(&task_input).await {
-        Ok(result) => {
-            HttpResponse::Ok().json(format!("Task {} executed successfully", result.task_uuid))
+        Ok(_) => {
+            HttpResponse::Ok().json(format!("Task {} Executed Successfully", task_input.task_uuid))
         }
         Err(err) => {
             eprintln!("Error computing tensor: {}", err);
-            HttpResponse::ServiceUnavailable().json("Network error occurred")
+            HttpResponse::ServiceUnavailable().json("Network Error Occurred")
         }
     }
 }
