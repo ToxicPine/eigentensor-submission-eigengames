@@ -6,6 +6,10 @@ TLDR: We implemented a universal, memory-safe, cross-platform format and runtime
 
 **SPECIAL NOTE:** you can split the graphs created by this tool into parts and run them on multiple GPUs!!! it doesn't parallelize the work, but it splits the VRAM requirements across multiple GPUs, which is a big deal!! VRAM is the limiting factor when running language models most of the time. we know that this is a good idea because it's used in the popular Exo inference software!
 
+## Prove That It Works
+
+Check out the `anytensor/src/anytensor/cli.py` file. This is a command-line tool that allows you to compile a tinygrad program into an EigenTensor graph, and then substitute values into the graph and execute it on a remote GPU. It does this all for you, you can read the code to confirm. The fact that this works is proof that we've achieved our goals.
+
 ## Why?
 
 Building GPU applications is hard. Whether you're deploying LLMs, doing scientific computing, or any other GPU-intensive task, you quickly run into limitations:
