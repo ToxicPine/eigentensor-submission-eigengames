@@ -62,6 +62,7 @@ def preprocess_image_numpy(image_bytes):
         img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
         img = cv2.resize(img, (28, 28))
     except:
+        log.error("Failed to decode image")
         # If decoding fails, assume it's already a raw array format
         img = nparr.reshape(28, 28)
 

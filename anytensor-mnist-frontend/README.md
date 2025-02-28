@@ -15,4 +15,4 @@ Behind the scenes, the drawn digit is:
 3. Processed with consensus verification between nodes
 4. Results returned to display the prediction
 
-## Getting Started
+**MORE DETAILS:** `anytensor-mnist-server/README.md`
